@@ -1,12 +1,12 @@
 {
-  "name": "ReactHomework",
+  "name": "BFQ",
   "version": "0.0.0",
-  "description": "Homework",
-  "main": "index.js",
+  "description": "The big friendly Q. A simple help/passoff queue for Teaching Assistants",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "lavanmark",
   "license": "ISC",
   "dependencies": {
     "express": "^4.13.3",
