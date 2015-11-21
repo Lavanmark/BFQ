@@ -280,7 +280,6 @@ var Student = React.createClass({
   }
 });
 
-
 var auth = {
     register: function(name, username, password, classkey, cb) {
         // submit request to server, call the callback when complete
