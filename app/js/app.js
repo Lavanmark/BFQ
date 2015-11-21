@@ -1,15 +1,12 @@
 var Router = ReactRouter.Router;
 var Link = ReactRouter.Link;
 var Route = ReactRouter.Route;
-
+//var ReactRouter = require("react-router");
+var History = ReactRouter.History;
 
 
 var App = React.createClass({
-  // context so the componevnt can access the router
-  contextTypes: {
-      router: React.PropTypes.func.isRequired
-  },
-
+  mixins: [ History ],
   // initial state
   getInitialState: function() {
       return {
@@ -31,7 +28,7 @@ var App = React.createClass({
   // logout the user and redirect to home page
   logout: function(event) {
       auth.logout();
-      this.context.router.replaceWith('/');
+      this.history.pushState(null, '/');
   },
   render: function() {
     return (
@@ -71,9 +68,7 @@ var NavBar = React.createClass({displayName: 'NavBar',
 
 var Login = React.createClass({
   // context so the component can access the router
-  contextTypes: {
-      router: React.PropTypes.func.isRequired
-  },
+  mixins: [ History ],
 
   // initial state
   getInitialState: function() {
@@ -105,7 +100,7 @@ var Login = React.createClass({
                 return this.setState({
                     error: true
                 });
-            Route.transitionTo('/student');
+            this.history.pushState(null, '/student');
         }.bind(this));
   },
   login: function(event) {
@@ -124,7 +119,7 @@ var Login = React.createClass({
                 return this.setState({
                     error: true
                 });
-            Route.transitionTo('/student');
+            this.history.pushState(null, '/student');
         }.bind(this));
   },
   componentDidMount: function() {
