@@ -18,7 +18,7 @@ var userSchema = new Schema({
     // index: true, unique: true
     password_hash: String,
     classkey: String,
-    perm: Boolean,
+    perm: Boolean, // true is ta, false is student
     timesInQ: Number, //default 0
 
 });
@@ -34,8 +34,20 @@ userSchema.methods.checkPassword = function(password) {
 };
 
 
-userSchema.methods.checkPerm = function() {
-    return this.perm;
+userSchema.methods.checkPerm = function(key,user) {
+    var fs = require('fs');
+    var userOk = -1;
+    var data = fs.readFileSync("./models/config.json");
+    var config = JSON.parse(data);
+    if(config.ClassKeyGeneral == key)
+        user.perm = false;
+    else if(config.ClassKeyTA == key)
+        user.perm = true;
+    else
+    {
+        console.log("bad key");
+        throw false;
+    }
 };
 
 

@@ -94,13 +94,16 @@ var Login = React.createClass({
         if(password !== confpass)
           return;
         // register via the API
-        auth.register(name, username, password, classkey, function(loggedIn) {
+        auth.register(name, username, password, classkey, function(loggedIn, perm) {
             // register callback
             if (!loggedIn)
                 return this.setState({
                     error: true
                 });
-            this.history.pushState(null, '/student');
+            if(perm)
+              this.history.pushState(null, '/ta');
+            else
+              this.history.pushState(null, '/student');
         }.bind(this));
   },
   login: function(event) {
@@ -113,13 +116,16 @@ var Login = React.createClass({
             return;
         }
         // login via API
-        auth.login(username, password, function(loggedIn) {
+        auth.login(username, password, function(loggedIn, perm) {
             // login callback
             if (!loggedIn)
                 return this.setState({
                     error: true
                 });
-            this.history.pushState(null, '/student');
+            if (perm)
+              this.history.pushState(null, '/ta');
+            else
+              this.history.pushState(null, '/student');
         }.bind(this));
   },
   componentDidMount: function() {
@@ -291,14 +297,16 @@ var auth = {
             data: {
                 name: name,
                 username: username,
-                password: password
+                password: password,
+                classkey: classkey
             },
             // on success, store a login token
             success: function(res) {
                 localStorage.token = res.token;
                 localStorage.name = res.name;
+                localStorage.perm = res.perm;
                 if (cb)
-                    cb(true);
+                    cb(true, res.perm);
                 this.onChange(true);
             }.bind(this),
             error: function(xhr, status, err) {
@@ -317,8 +325,7 @@ var auth = {
         // check if token in local storage
         if (localStorage.token) {
             if (cb) {
-                cb(true);
-
+                cb(true, localStorage.perm);
             }
             this.onChange(true);
             return;
@@ -338,13 +345,15 @@ var auth = {
                 // on success, store a login token
                 localStorage.token = res.token;
                 localStorage.name = res.name;
+                localStorage.perm = res.perm;
                 if (cb)
-                    cb(true);
+                    cb(true,res.perm);
                 this.onChange(true);
             }.bind(this),
             error: function(xhr, status, err) {
                 // if there is an error, remove any login token
                 delete localStorage.token;
+                delete localStorage.perm;
                 if (cb)
                     cb(false);
                 this.onChange(false);
@@ -359,9 +368,14 @@ var auth = {
     getName: function() {
         return localStorage.name;
     },
+
+    getPerm: function() {
+        return localStorage.perm;
+    },
     // logout the user, call the callback when complete
     logout: function(cb) {
         delete localStorage.token;
+        delete localStorage.perm;
         if (cb) cb();
         this.onChange(false);
     },

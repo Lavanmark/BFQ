@@ -15,23 +15,33 @@ app.use(bodyParser.urlencoded({
 // register a user
 app.post('/register', function (req, res) {
     // find or create the user with the given username
+    
     User.findOrCreate({username: req.body.username}, function(err, user, created) {
         if (created) {
             // if this username is not taken, then create a user record
             user.name = req.body.name;
             user.set_password(req.body.password);
             user.classkey = req.body.classkey;
-            user.perm = false;
+            console.log(req.body.classkey);
+            try{
+                user.checkPerm(user.classkey, user);
+            } catch(e){
+                User.find(user).remove().exec(); // trying to delete user if bad key
+                console.log(e);
+                res.sendStatus("403");
+                return;
+            }
             user.timesInQ = 0;
             user.save(function(err) {
         		if (err) {
+                    User.find(user).remove().exec(); //trying to delete user if bad key
         		    res.sendStatus("403");
         		    return;
         		}
                 // create a token
         		var token = User.generateToken(user.username);
                 // return value is JSON containing the user's name and token
-                res.json({name: user.name, token: token});
+                res.json({name: user.name, token: token, perm: user.perm});
             });
         } else {
             // return an error if the username is taken
@@ -53,7 +63,7 @@ app.post('/login/verify', function (req, res) {
             // create a token
             var token = User.generateToken(user.username);
             // return value is JSON containing user's name and token
-            res.json({name: user.name, token: token});
+            res.json({name: user.name, token: token, perm: user.perm});
         } else {
             res.sendStatus(403);
         }
