@@ -399,7 +399,7 @@ var auth = {
 var routes = (
   <Router>
     <Route path="/" component={App}>
-      <Route path="recover" component={Recover}/>
+      <Route path="/recover" component={Recover}/>
        <Route path="/ta" component={TA}/>
     <Route path="/student" component={Student}/>
     </Route>
