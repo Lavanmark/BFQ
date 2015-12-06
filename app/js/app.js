@@ -39,33 +39,6 @@ var App = React.createClass({
   }
 });
 
-var NavBar = React.createClass({displayName: 'NavBar',
-  render: function() {
-    return (
-    <nav className="navbar navbar-default">
-      <div className="container-fluid">
-        <div className="navbar-header">
-          <button type="button" className="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
-            <span className="sr-only">Toggle navigation</span>
-            <span className="icon-bar"></span>
-            <span className="icon-bar"></span>
-            <span className="icon-bar"></span>
-          </button>
-          <a className="navbar-brand" href="#">Brand</a>
-        </div>
-        <div className="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-          <ul className="nav navbar-nav">
-            <li className="active" id="login"><Link to="#">Login<span className="sr-only">(current)</span></Link></li>
-            <li id="p2link"><Link to="p2">Page Two</Link></li>
-          </ul>
-        </div>
-      </div>
-    </nav>
-    );
-  }
-});
-
-
 var Login = React.createClass({
   // context so the component can access the router
   mixins: [ History ],
@@ -192,7 +165,7 @@ var Login = React.createClass({
                             <div className="row">
                               <div className="col-lg-12">
                                 <div className="text-center">
-                                  <Link to="recover" tabIndex="5" className="forgot-password">Forgot Password?</Link>
+                                  <Link to="/recover" tabIndex="5" className="forgot-password">Forgot Password?</Link>
                                 </div>
                               </div>
                             </div>
@@ -237,29 +210,6 @@ var Login = React.createClass({
           </div>
       );
     }
-});
-
-var Register = React.createClass({
-  render: function() {
-
-  }
-});
-
-var PageTwo = React.createClass({
-
-  componentDidMount: function() {
-    $(".nav").find(".active").removeClass("active");
-    $("#p2link").addClass("active");
-    
-  },
-  render: function() {
-    return (
-      <div>
-        <NavBar />
-        <h1>Page Two</h1>
-      </div>
-    );
-  }
 });
 
 var Recover = React.createClass({
