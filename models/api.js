@@ -12,10 +12,29 @@ app.use(bodyParser.urlencoded({
 // API
 //
 
-// register a user
+
+/********************************************************
+*
+* LOGIN
+*
+*********************************************************/
+
+
+/**
+* REGISTER
+*   - register a new user.
+*   params
+*       - username
+*       - password and conformation password
+*       - name
+*       - classkey
+*   return
+*       - name
+*       - token
+*       - permissions (true = ta, false = student)
+*/
 app.post('/register', function (req, res) {
     // find or create the user with the given username
-    
     User.findOrCreate({username: req.body.username}, function(err, user, created) {
         if (created) {
             // if this username is not taken, then create a user record
@@ -50,7 +69,18 @@ app.post('/register', function (req, res) {
     });
 });
 
-// login a user
+
+/**
+* LOGIN
+*   - login a user.
+*   params
+*       - username
+*       - password
+*   return
+*       - name
+*       - token
+*       - permissions (true = ta, false = student)
+*/
 app.post('/login/verify', function (req, res) {
     // find the user with the given username
     User.findOne({username: req.body.username}, function(err,user) {
@@ -70,119 +100,258 @@ app.post('/login/verify', function (req, res) {
     });
 });
 
-// // get all items for the user
-// app.get('/api/items', function (req,res) {
-//     // validate the supplied token
-//     user = User.verifyToken(req.headers.authorization, function(user) {
-//         if (user) {
-//             // if the token is valid, find all the user's items and return them
-// 	    Item.find({user:user.id}, function(err, items) {
-// 		if (err) {
-// 		    res.sendStatus(403);
-// 		    return;
-// 		}
-// 		// return value is the list of items as JSON
-// 		res.json({items: items});
-// 	    });
-//         } else {
-//             res.sendStatus(403);
-//         }
-//     });
-// });
 
-// // add an item
-// app.post('/api/items', function (req,res) {
-//     // validate the supplied token
-//     // get indexes
-//     user = User.verifyToken(req.headers.authorization, function(user) {
-//         if (user) {
-//             // if the token is valid, create the item for the user
-// 	    Item.create({title:req.body.item.title,completed:false,user:user.id}, function(err,item) {
-// 		if (err) {
-// 		    res.sendStatus(403);
-// 		    return;
-// 		}
-// 		res.json({item:item});
-// 	    });
-//         } else {
-//             res.sendStatus(403);
-//         }
-//     });
-// });
+/**
+* PASSWORD RESET
+*   - ta can reset a password.
+*   params
+*       - username
+*       - new password
+*   return
+*       - status 
+*/
+app.post('/reset', function (req,res){
+    User.findOne({username: req.body.username}, function(err,user) {
+        if (err) {
+            res.sendStatus(403);
+            return;
+        }
+        if (user) {
+            user.password = req.body.newPassword;
+            user.save(function(err) {
+                if (err) {
+                    res.sendStatus(403);
+                    return;
+                }
+                res.sendStatus(200)
+            });
+        } else {
+            res.sendStatus(403);
+        }
+    });
+});
 
-// // get an item
-// app.get('/api/items/:item_id', function (req,res) {
-//     // validate the supplied token
-//     user = User.verifyToken(req.headers.authorization, function(user) {
-//         if (user) {
-//             // if the token is valid, then find the requested item
-//             Item.findById(req.params.item_id, function(err, item) {
-// 		if (err) {
-// 		    res.sendStatus(403);
-// 		    return;
-// 		}
-//                 // get the item if it belongs to the user, otherwise return an error
-//                 if (item.user != user) {
-//                     res.sendStatus(403);
-// 		    return;
-//                 }
-//                 // return value is the item as JSON
-//                 res.json({item:item});
-//             });
-//         } else {
-//             res.sendStatus(403);
-//         }
-//     });
-// });
 
-// // update an item
-// app.put('/api/items/:item_id', function (req,res) {
-//     // validate the supplied token
-//     user = User.verifyToken(req.headers.authorization, function(user) {
-//         if (user) {
-//             // if the token is valid, then find the requested item
-//             Item.findById(req.params.item_id, function(err,item) {
-// 		if (err) {
-// 		    res.sendStatus(403);
-// 		    return;
-// 		}
-//                 // update the item if it belongs to the user, otherwise return an error
-//                 if (item.user != user.id) {
-//                     res.sendStatus(403);
-// 		    return;
-//                 }
-//                 item.title = req.body.item.title;
-//                 item.completed = req.body.item.completed;
-//                 item.save(function(err) {
-// 		    if (err) {
-// 			res.sendStatus(403);
-// 			return;
-// 		    }
-//                     // return value is the item as JSON
-//                     res.json({item:item});
-//                 });
-// 	    });
-//         } else {
-//             res.sendStatus(403);
-//         }
-//     });
-// });
+/********************************************************
+*
+* QUEUE
+*
+*********************************************************/
 
-// // delete an item
-// app.delete('/api/items/:item_id', function (req,res) {
-//     // validate the supplied token
-//     user = User.verifyToken(req.headers.authorization, function(user) {
-//         if (user) {
-//             // if the token is valid, then find the requested item
-//             Item.findByIdAndRemove(req.params.item_id, function(err,item) {
-// 		if (err) {
-// 		    res.sendStatus(403);
-// 		    return;
-// 		}
-//                 res.sendStatus(200);
-//             });
-//         } else {
-//             res.sendStatus(403);
-//         }
-//     });
-// });
+
+//the queue
+var q = []
+//state of the queue
+var qActive = false;
+
+
+/**
+* GET QUEUE INFO
+*   - will send size of queue.
+*   params - none
+*   return
+*       - queue size
+*       - queue active
+*/
+app.get('/q/status', function(req,res){
+    res.json({size: q.length, active: qActive});
+});
+
+
+/**
+* GET POSITION
+*   - will send users position.
+*   params
+*       - token
+*   return
+*       - position
+*       - queue size
+*       - queue active
+*/
+app.get('/q/get/position', function(req,res){
+    var token = req.body.token;
+    
+    User.verifyToken(token, function(user){
+        if(user){
+            var pos = q.indexOf(user);
+            res.json({position: pos, size: q.length, active: qActive});
+        }else{
+            res.sendStatus(403);
+        }
+    });
+});
+
+
+
+/********************************************************
+*
+* QUEUE CONTROL -- TA
+*
+*********************************************************/
+
+
+
+/**
+* START
+*   - will signal for adding to be enabled.
+*   params
+*       - token
+*   return
+*       - status
+*/
+app.post('/ta/start', function(req,res){
+    var token = req.body.token;
+    
+    User.verifyToken(token, function(user){
+        if(user && user.perm){
+            qActive = true;
+            res.sendStatus(200);
+        }else{
+            res.sendStatus(403);
+        }
+    });
+});
+
+
+/**
+* STOP
+*   - will signal for adding to be disabled.
+*   params
+*       - token
+*   return
+*       - status
+*/
+app.post('/ta/stop', function(req,res){
+    var token = req.body.token;
+
+    User.verifyToken(token, function(user){
+        if(user && user.perm){
+            qActive = false;
+            res.sendStatus(200);
+        }else{
+            res.sendStatus(403);
+        }
+    });
+});
+
+
+/**
+* EMPTY
+*   - will empty the queue.
+*   params
+*       - token
+*   return
+*       - status
+*/
+app.post('/ta/empty', function(req,res){
+    var token = req.body.token;
+
+    User.verifyToken(token, function(user){
+        if(user && user.perm){
+            q = [];
+            res.sendStatus(200);
+        }else{
+            res.sendStatus(403);
+        }
+    });
+});
+
+
+/**
+* GET NEXT / REMOVE TOP
+*   - will remove the student from the front of the queue if it student is there
+*   params
+*       - token
+*   return
+*       - name
+*       - queue length
+*/
+app.get('/ta/next', function(req,res){
+    var token = req.body.token;
+
+    if(qActive){
+        User.verifyToken(token,function(user){
+            if(user){
+                if(user.perm && q.length > 0){
+                    var nextStu = q.shift();
+                    res.json({name: nextStu.name,size: q.length});
+                }else
+                    res.sendStatus(403);
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.sendStatus(403);
+});
+
+
+
+/********************************************************
+*
+* QUEUE CONTROL -- STUDENT
+*
+*********************************************************/
+
+
+/**
+* ADD
+*   - will add the student to queue, if not already there.
+*   params
+*       - token
+*   return
+*       - status
+*/
+app.post('/student/add', function(req,res){
+    var token = req.body.token;
+
+    if(qActive){
+        User.verifyToken(token, function(user){
+            if(user){
+                if(!user.perm){
+                    if(q.indexOf(user) == -1){
+                        q.push(user);
+                        res.sendStatus(200);
+                    }else
+                        res.sendStatus(403);
+                }
+                else
+                    res.sendStatus(403);
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.sendStatus(403);
+
+});
+
+
+/**
+* REMOVE
+*   - will remove the student from the queue if it student is there
+*   params
+*       - token
+*   return
+*       - status
+*/
+app.post('/student/remove', function(req,res){
+    var token = req.body.token;
+
+    if(qActive){
+        User.verifyToken(token,function(req,res){
+            if(user){
+                var userPos = q.indexOf(user);
+                if(userPos != -1){
+                    q.splice(userPos,1);
+                    res.sendStatus(200);
+                }else
+                    res.sendStatus(403);
+                
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.sendStatus(403);
+});

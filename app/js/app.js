@@ -304,6 +304,7 @@ var auth = {
             success: function(res) {
                 localStorage.token = res.token;
                 localStorage.name = res.name;
+                localStorage.username = username;
                 localStorage.perm = res.perm;
                 if (cb)
                     cb(true, res.perm);
@@ -312,6 +313,9 @@ var auth = {
             error: function(xhr, status, err) {
                 // if there is an error, remove any login token
                 delete localStorage.token;
+                delete localStorage.username;
+                delete localStorage.name;
+                delete localStorage.perm;
                 if (cb)
                     cb(false);
                 this.onChange(false);
@@ -323,7 +327,7 @@ var auth = {
         // submit login request to server, call callback when complete
         cb = arguments[arguments.length - 1];
         // check if token in local storage
-        if (localStorage.token) {
+        if (localStorage.token && localStorage.username == username) {
             if (cb) {
                 cb(true, localStorage.perm);
             }
@@ -344,6 +348,7 @@ var auth = {
             success: function(res) {
                 // on success, store a login token
                 localStorage.token = res.token;
+                localStorage.username = username;
                 localStorage.name = res.name;
                 localStorage.perm = res.perm;
                 if (cb)
@@ -353,6 +358,8 @@ var auth = {
             error: function(xhr, status, err) {
                 // if there is an error, remove any login token
                 delete localStorage.token;
+                delete localStorage.username;
+                delete localStorage.name;
                 delete localStorage.perm;
                 if (cb)
                     cb(false);
@@ -375,6 +382,8 @@ var auth = {
     // logout the user, call the callback when complete
     logout: function(cb) {
         delete localStorage.token;
+        delete localStorage.perm;
+        delete localStorage.username;
         delete localStorage.perm;
         if (cb) cb();
         this.onChange(false);

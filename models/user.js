@@ -37,7 +37,7 @@ userSchema.methods.checkPassword = function(password) {
 userSchema.methods.checkPerm = function(key,user) {
     var fs = require('fs');
     var userOk = -1;
-    var data = fs.readFileSync("./models/config.json");
+    var data = fs.readFileSync("./config.json");
     var config = JSON.parse(data);
     if(config.ClassKeyGeneral == key)
         user.perm = false;
@@ -74,12 +74,12 @@ userSchema.statics.verifyToken = function(token,cb) {
             return;
         }
         User.findOne({username: decoded.username},function(err,user) {
-	    if (err) {
-		cb(null);
-	    } else {
-		cb(user);
-	    }
-	});
+    	    if (err) {
+                cb(null);
+    	    } else {
+                cb(user);
+    	    }
+        });
     });
 };
 
