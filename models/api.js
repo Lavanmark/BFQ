@@ -140,7 +140,8 @@ app.post('/reset', function (req,res){
 
 
 //the queue
-var q = []
+var q = [];
+var message = [];
 //state of the queue
 var qActive = false;
 
@@ -157,9 +158,21 @@ app.get('/q/status', function(req,res){
     res.json({size: q.length, active: qActive});
 });
 
+/**
+ * GET QUEUE
+ *   - will send queue
+ *   params - none
+ *   return
+ *       - queue
+ *       - queue size
+ *       - queue active
+ */
+app.get('/q/queue', function(req,res){
+    res.json({queue: q, size: q.length, active: qActive});
+});
 
 /**
-* GET POSITION
+* GET POSITION (DEPRECATED: USE STUDENT/POSITION
 *   - will send users position.
 *   params
 *       - token
@@ -248,6 +261,12 @@ app.post('/ta/empty', function(req,res){
 
     User.verifyToken(token, function(user){
         if(user && user.perm){
+            q.forEach(function(e, i, a) {
+                message.push({
+                    key: e.username,
+                    value: "removed"
+                });
+            });
             q = [];
             res.sendStatus(200);
         }else{
@@ -256,25 +275,31 @@ app.post('/ta/empty', function(req,res){
     });
 });
 
-
 /**
-* GET NEXT / REMOVE TOP
-*   - will remove the student from the front of the queue if it student is there
-*   params
-*       - token
-*   return
-*       - name
-*       - queue length
-*/
-app.get('/ta/next', function(req,res){
+ * GET AT
+ *   - will remove the student from the given position in the queue if it student is there
+ *   params
+ *       - token
+ *       - position
+ *   return
+ *       - name
+ *       - queue
+ *       - queue length
+ */
+app.post('/ta/at', function(req,res){
     var token = req.body.token;
+    var pos = req.body.position;
 
     if(qActive){
-        User.verifyToken(token,function(user){
+        User.verifyToken(token, function(user){
             if(user){
                 if(user.perm && q.length > 0){
-                    var nextStu = q.shift();
-                    res.json({name: nextStu.name,size: q.length});
+                    var nextStu = q.splice(pos, 1);
+                    message.push({
+                        key: nextStu.username,
+                        value: "helping"
+                    });
+                    res.json({queue: q, name: nextStu.name, size: q.length});
                 }else
                     res.sendStatus(403);
             }else{
@@ -285,7 +310,73 @@ app.get('/ta/next', function(req,res){
         res.sendStatus(403);
 });
 
+/**
+* GET NEXT / REMOVE TOP
+*   - will remove the student from the front of the queue if it student is there
+*   params
+*       - token
+*   return
+*       - name
+ *      - queue
+*       - queue length
+*/
+app.post('/ta/next', function(req,res){
+    var token = req.body.token;
 
+    if(qActive){
+        User.verifyToken(token,function(user){
+            if(user){
+                if(user.perm && q.length > 0){
+                    var nextStu = q.shift();
+                    message.push({
+                        key: nextStu.username,
+                        value: "helping"
+                    });
+                    res.json({queue: q, name: nextStu.name, size: q.length});
+                }else
+                    res.sendStatus(403);
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.sendStatus(403);
+});
+
+/**
+ * REMOVE
+ *   - will remove the student from the queue if it student is there
+ *   params
+ *       - token
+ *       - studentIndex
+ *   return
+ *       - name
+ *       - queue length
+ */
+app.post('/ta/remove', function(req,res){
+    var token = req.body.token;
+    var position = req.body.position;
+
+    if(qActive){
+        User.verifyToken(token,function(user){
+            if(user){
+                if(user.perm && q.length > 0 && position != -1){
+                    var nextStu = q[position];
+                    q.splice(position, 1);
+                    message.push({
+                        key: nextStu.username,
+                        value: "removed"
+                    });
+                    res.json({name: nextStu.name, size: q.length});
+                }else
+                    res.sendStatus(403);
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.sendStatus(403);
+});
 
 /********************************************************
 *
@@ -309,7 +400,10 @@ app.post('/student/add', function(req,res){
         User.verifyToken(token, function(user){
             if(user){
                 if(!user.perm){
-                    if(q.indexOf(user) == -1){
+                    var pos = q.findIndex(function(e, i, a) {
+                        return e.username == user.username;
+                    })
+                    if(pos == -1){
                         q.push(user);
                         res.sendStatus(200);
                     }else
@@ -339,11 +433,13 @@ app.post('/student/remove', function(req,res){
     var token = req.body.token;
 
     if(qActive){
-        User.verifyToken(token,function(req,res){
+        User.verifyToken(token, function(user){
             if(user){
-                var userPos = q.indexOf(user);
-                if(userPos != -1){
-                    q.splice(userPos,1);
+                var pos = q.findIndex(function(e, i, a) {
+                    return e.username == user.username;
+                });
+                if(pos != -1){
+                    q.splice(pos,1);
                     res.sendStatus(200);
                 }else
                     res.sendStatus(403);
@@ -354,4 +450,42 @@ app.post('/student/remove', function(req,res){
         });
     }else
         res.sendStatus(403);
+});
+
+/**
+ * POSITION
+ *   - returns the student's position on the queue, or -1 if not on queue
+ *   params
+ *       - token
+ *   return
+ *       - status
+ *       - position
+ */
+app.post('/student/position', function(req,res){
+    var token = req.body.token;
+
+    if(qActive){
+        User.verifyToken(token, function(user){
+            if(user){
+                message.forEach(function(e, i, a) {
+                   console.log(e.key + " " + e.value);
+                });
+                var messageIndex = message.findIndex(function(e, i, a) {
+                   return e.key == user.username;
+                });
+                if (messageIndex != -1) {
+                    res.json({active: true, size: q.length, position: -1, message: message[messageIndex].value});
+                    message.splice(messageIndex, 1);
+                    return;
+                }
+                var pos = q.findIndex(function(e, i, a) {
+                    return e.username == user.username;
+                });
+                res.json({active: true, size: q.length, position: pos, message: null});
+            }else{
+                res.sendStatus(403);
+            }
+        });
+    }else
+        res.json({active: false, size: 0, position: -1});
 });

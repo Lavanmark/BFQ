@@ -3,6 +3,7 @@ var Link = ReactRouter.Link;
 var Route = ReactRouter.Route;
 //var ReactRouter = require("react-router");
 var History = ReactRouter.History;
+var Modal = ReactBootstrap.Modal;
 
 
 var App = React.createClass({
@@ -221,19 +222,264 @@ var Recover = React.createClass({
 });
 
 var TA = React.createClass({
+  getInitialState: function() {
+    return {queue: null, size: 0, active: false};
+  },
+    getNext: function() {
+        var url = "/ta/next";
+        $.ajax({
+            url: url,
+            dataType: 'json',
+            type: 'POST',
+            data: {
+                token: localStorage.token
+            },
+            // on success, update queue
+            success: function(res) {
+                this.setState({queue: res.queue, size: res.size});
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }.bind(this)
+        });
+    },
+  getQueue: function() {
+      var url = "/q/queue";
+      $.ajax({
+          url: url,
+          dataType: 'json',
+          type: 'GET',
+          // on success, update queue
+          success: function(res) {
+              this.setState({queue: res.queue, size: res.size, active: res.active});
+          }.bind(this),
+          error: function(xhr, status, err) {
+              console.error(url, status, err.toString());
+          }.bind(this)
+      });
+  },
+  getQueueStatus: function() {
+      var url = "/q/status";
+      $.ajax({
+          url: url,
+          dataType: 'json',
+          type: 'GET',
+          // on success, update queue
+          success: function(res) {
+              if (this.state.active != res.active || this.state.size != res.size) {
+                  this.getQueue();
+              }
+          }.bind(this),
+          error: function(xhr, status, err) {
+              console.error(url, status, err.toString());
+          }.bind(this)
+      });
+  },
+  disableQueue: function() {
+      console.log("disabling queue");
+      var url = "/ta/stop";
+      $.ajax({
+          url: url,
+          type: 'POST',
+          data: {
+            token: localStorage.token
+          },
+          // on success, update queue
+          success: function(res) {
+              this.setState({queue: null, size: 0, active: false});
+          }.bind(this),
+          error: function(xhr, status, err) {
+              console.error(url, status, err.toString());
+          }.bind(this)
+      });
+  },
+    enableQueue: function() {
+        console.log("enabling queue");
+        var url = "/ta/start";
+        $.ajax({
+          url: url,
+            type: 'POST',
+            data: {
+            token: localStorage.token
+        },
+        // on success, update queue
+        success: function() {
+            this.getQueue();
+        }.bind(this),
+            error: function(xhr, status, err) {
+            console.error(url, status, err.toString());
+        }.bind(this)});
+    },
+    removeStudent: function(position) {
+        var url = "/ta/remove";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+                token: localStorage.token,
+                position: position
+            },
+            // on success, update queue
+            success: function(res) {
+                // TODO: Show modal
+                this.getQueue();
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }.bind(this)});
+    },
+  componentDidMount: function() {
+      this.getQueue();
+      setInterval(this.getQueueStatus, 2000);
+  },
+  onChange: function() {},
   render: function() {
+      console.log("rendering");
+      var buttontext = this.state.active ? "Stop" : "Start";
+      var onClickFun = this.state.active ? this.disableQueue : this.enableQueue;
+      var buttontype = this.state.active ? "btn btn-danger" : "btn btn-success";
+      var index = 0;
+      //<button className="btn btn-warning" onClick={this.emptyQueue}>Empty Queue</button>
     return (
-      <h1>TA Page</h1>
+        <div className="row">
+            <div className="col-xs-10 col-xs-offset-1">
+                <button className={buttontype} onClick={onClickFun}>{buttontext}</button>
+                <button className="btn btn-default" onClick={this.getNext}>Get Next Student</button>
+                <table className="table">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Select</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {this.state.queue != null ? this.state.queue.map(function(student) {
+                        ++index;
+                        return(<tr>
+                            <td>{index}</td>
+                            <td>{student.name}</td>
+                            <td><button className="btn btn-default" onClick={this.removeStudent.bind(this, index - 1)}>Remove</button></td>
+                        </tr>);
+                    }.bind(this)) : null}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
   }
 });
 
 var Student = React.createClass({
-  render: function() {
-    return (
-      <h1>Student Page</h1>
-    );
-  }
+    getInitialState: function() {
+        return {position: -1, size: 0, active: false, message: null};
+    },
+    closeModal: function() {
+      this.setState({message: null});
+    },
+    getPosition: function() {
+      var url = "/student/position";
+        $.ajax({
+           url: url,
+            dataType: 'json',
+            type: 'POST',
+            data: {
+                token: localStorage.token
+            },
+            success: function(res) {
+                if (res.message) {
+                    this.setState({active: res.active, size: res.size, position: res.position, message: res.message});
+                } else if (this.state.active != res.active || this.state.size != res.size || this.state.position != res.position) {
+                    this.setState({active: res.active, size: res.size, position: res.position});
+                }
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }
+        });
+    },
+    join: function() {
+        console.log("joining queue");
+        var url = "/student/add";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+              token: localStorage.token
+            },
+            // on success, update queue
+            success: function() {
+                this.getPosition();
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }.bind(this)
+        });
+    },
+    leave: function() {
+        var url = "/student/remove";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+                token: localStorage.token
+            },
+            success: function() {
+                this.getPosition();
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }.bind(this)
+        });
+    },
+    componentDidMount: function() {
+        this.getPosition();
+        setInterval(this.getPosition, 2000);
+    },
+    testing: function() {
+        console.log("testing!");
+    },
+    render: function() {
+        console.log("rendering");
+        return (
+            <div className="container">
+                <div className="row">
+                    {this.state.active ?
+                        <div className="col-md-6 col-md-offset-3">
+                            <h2>Queue is Active!</h2>
+                            <p>Current queue size is: {this.state.size}</p>
+                            {this.state.position != -1 ?
+                                <div>
+                                    {this.state.position == 0 ?
+                                        <h2>You are next</h2>:
+                                        (this.state.position == 1 ?
+                                            <h2>There is 1 person in front of you</h2>:
+                                            <h2>There are {this.state.position} people in front of you</h2>)}
+                                    <button className="btn btn-danger" onClick={this.leave}>Leave Queue</button>
+                                </div>:
+                                <button className="btn btn-info" onClick={this.join}>Join Queue</button>}
+                        </div>:
+                        <h2>Queue not active</h2>}
+                </div>
+                <Modal show={this.state.message == "helping"} onHide={this.closeModal}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>The TA should arrive shortly</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>Please do not add yourself back onto the queue until the TA arrives.</p>
+                    </Modal.Body>
+                </Modal>
+                <Modal show={this.state.message == "removed"} onHide={this.closeModal}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>You have been removed from the queue</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>If you feel you have been removed without reason, please contact a TA.</p>
+                    </Modal.Body>
+                </Modal>
+            </div>
+        );
+    }
 });
 
 var auth = {
