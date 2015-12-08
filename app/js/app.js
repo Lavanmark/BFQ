@@ -34,13 +34,17 @@ var App = React.createClass({
 
   // when the component loads, setup the callback
   componentWillMount: function() {
-      auth.onChange = this.setStateOnAuth;
+      auth.onChange.push({cb: this.setStateOnAuth, component: "App"});
       navBarStore.addChangeListener(this.setNavItems, 'items');
       navBarStore.addChangeListener(this.setCount, 'count');
   },
 
     componentWillUnmount: function() {
         navBarStore.removeChangeListener(this.setNavItems);
+        var index = auth.onChange.findIndex(function(e, i, a) {
+            return e.component == "App";
+        });
+        auth.onChange.splice(index, 1);
     },
 
     componentDidMount: function() {
@@ -54,13 +58,16 @@ var App = React.createClass({
     toLogin: function() {
         this.history.pushState(null, '/login');
     },
+    toHome: function() {
+        this.history.pushState(null, '/');
+    },
   render: function() {
     return (
       <div style={{height: "100vh"}}>
           <Navbar>
               <Navbar.Header>
-                  <Navbar.Brand>
-                      <a>BFQ </a>
+                  <Navbar.Brand onClick={this.toHome}>
+                      <span>BFQ </span>
                       <span className="badge">{this.state.count}</span>
                   </Navbar.Brand>
                   <Navbar.Toggle />
@@ -99,8 +106,40 @@ var App = React.createClass({
 });
 
 var Home = React.createClass({
+    mixins: [ History ],
+    getInitialState: function() {
+        return {loggedIn: auth.loggedIn()};
+    },
+    setStateOnAuth: function(loggedIn) {
+        if (this.loggedIn) {
+            navBarStore.setItems([{callback: this.toQueue, label: "Queue"}]);
+        } else {
+            navBarStore.setItems(null);
+        }
+        this.setState({loggedIn: loggedIn});
+    },
     componentDidMount: function() {
-        navBarStore.setItems(null);
+        auth.onChange.push({cb: this.setStateOnAuth, component: "Home"});
+        if (this.state.loggedIn) {
+            navBarStore.setItems([{callback: this.toQueue, label: "Queue"}]);
+        } else {
+            navBarStore.setItems(null);
+        }
+    },
+    componentWillMount: function() {
+
+    },
+    componentWillUnmount: function() {
+        var index = auth.onChange.findIndex(function(e, i, a) {
+            return e.component == "Home";
+        });
+        auth.onChange.splice(index, 1);
+    },
+    toQueue: function() {
+        if (auth.getPerm())
+            this.history.pushState(null, '/ta');
+        else
+            this.history.pushState(null, '/student');
     },
    render: function() {
        return (
@@ -743,7 +782,7 @@ var navBarStore = {
         this.count = count;
         this.emitChange('count');
     }
-}
+};
 
 var auth = {
     register: function(name, username, password, classkey, cb) {
@@ -767,7 +806,9 @@ var auth = {
                 localStorage.perm = res.perm;
                 if (cb)
                     cb(true, res.perm);
-                this.onChange(true);
+                this.onChange.forEach(function(obj) {
+                    obj.cb(true);
+                });
             }.bind(this),
             error: function(xhr, status, err) {
                 // if there is an error, remove any login token
@@ -777,7 +818,9 @@ var auth = {
                 delete localStorage.perm;
                 if (cb)
                     cb(false);
-                this.onChange(false);
+                this.onChange.forEach(function(obj) {
+                    obj.cb(false);
+                });
             }.bind(this)
         });
     },
@@ -790,7 +833,9 @@ var auth = {
             if (cb) {
                 cb(true, localStorage.perm);
             }
-            this.onChange(true);
+            this.onChange.forEach(function(obj) {
+                obj.cb(true);
+            });
             return;
         }
 
@@ -812,7 +857,9 @@ var auth = {
                 localStorage.perm = res.perm;
                 if (cb)
                     cb(true,res.perm);
-                this.onChange(true);
+                this.onChange.forEach(function(obj) {
+                    obj.cb(true);
+                });
             }.bind(this),
             error: function(xhr, status, err) {
                 // if there is an error, remove any login token
@@ -822,7 +869,9 @@ var auth = {
                 delete localStorage.perm;
                 if (cb)
                     cb(false);
-                this.onChange(false);
+                this.onChange.forEach(function(obj) {
+                    obj.cb(false);
+                });
             }.bind(this)
         });
     },
@@ -845,14 +894,16 @@ var auth = {
         delete localStorage.username;
         delete localStorage.perm;
         if (cb) cb();
-        this.onChange(false);
+        this.onChange.forEach(function(obj) {
+            obj.cb(false);
+        });
     },
     // check if user is logged in
     loggedIn: function() {
         return !!localStorage.token;
     },
     // default onChange function
-    onChange: function() {},
+    onChange: []
 };
 
 var routes = (
