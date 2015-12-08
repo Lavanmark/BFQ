@@ -4,6 +4,10 @@ var Route = ReactRouter.Route;
 //var ReactRouter = require("react-router");
 var History = ReactRouter.History;
 var Modal = ReactBootstrap.Modal;
+var Nav = ReactBootstrap.Nav;
+var NavItem = ReactBootstrap.NavItem;
+var Navbar = ReactBootstrap.Navbar;
+var Input = ReactBootstrap.Input;
 
 
 var App = React.createClass({
@@ -12,32 +16,103 @@ var App = React.createClass({
   getInitialState: function() {
       return {
         // the user is logged in
-          loggedIn: auth.loggedIn()
+          loggedIn: auth.loggedIn(),
+          items: null,
+          count: 0
       };
   },
-
+    setCount: function() {
+        this.setState({count: navBarStore.count});
+    },
+    setNavItems: function() {
+        this.setState({items: navBarStore.items});
+    },
   // callback when user is logged in
   setStateOnAuth: function(loggedIn) {
-      this.state.loggedIn = loggedIn;
+      this.setState({loggedIn: loggedIn});
   },
 
   // when the component loads, setup the callback
   componentWillMount: function() {
       auth.onChange = this.setStateOnAuth;
+      navBarStore.addChangeListener(this.setNavItems, 'items');
+      navBarStore.addChangeListener(this.setCount, 'count');
   },
+
+    componentWillUnmount: function() {
+        navBarStore.removeChangeListener(this.setNavItems);
+    },
+
+    componentDidMount: function() {
+    },
 
   // logout the user and redirect to home page
   logout: function(event) {
       auth.logout();
       this.history.pushState(null, '/');
   },
+    toLogin: function() {
+        this.history.pushState(null, '/login');
+    },
   render: function() {
     return (
-      <div>
-        { this.props.children || <Login />}
+      <div style={{height: "100vh"}}>
+          <Navbar>
+              <Navbar.Header>
+                  <Navbar.Brand>
+                      <a>BFQ </a>
+                      <span className="badge">{this.state.count}</span>
+                  </Navbar.Brand>
+                  <Navbar.Toggle />
+              </Navbar.Header>
+              <Navbar.Collapse>
+                  <Nav>
+                      {this.state.items != null ?
+                          this.state.items.map(function(item) {
+                              return (<NavItem onClick={item.callback}>{item.label}</NavItem>);
+                          }) : null
+                      }
+                  </Nav>
+                  <Nav pullRight>
+                      {this.state.loggedIn ?
+                          <NavItem onClick={this.logout}>Logout</NavItem> :
+                          <NavItem onClick={this.toLogin}>Login/Register</NavItem>
+                      }
+                  </Nav>
+              </Navbar.Collapse>
+          </Navbar>
+        { this.props.children}
+          <footer className="footer">
+              <div className="container-fluid">
+                  <div className="row">
+                      <div className="col-xs-12 col-md-6 col-md-offset-3">
+                          <p> </p>
+                          <p className="text-center">Powered by <strong>Node.js</strong>, <strong>MongoDB</strong>, and <strong>React</strong>. You can see the source <a href="https://github.com/Lavanmark/BFQ">here</a>.</p>
+                          <p className="text-center">© 2015 Levi Rodriguez and Tyler Draughon.</p>
+                      </div>
+                  </div>
+              </div>
+          </footer>
       </div>
     );
   }
+});
+
+var Home = React.createClass({
+    componentDidMount: function() {
+        navBarStore.setItems(null);
+    },
+   render: function() {
+       return (
+         <div className="row">
+             <div className="col-xs-12 col-md-4 col-md-offset-4">
+                 <h3> </h3>
+                 <img className="center-block" src="BFQ.png" alt="BFQ View" style={{width: "240px", height: "240px"}} />
+                 <h3 className="text-center">The Big Friendly Queue</h3>
+             </div>
+         </div>
+       );
+   }
 });
 
 var Login = React.createClass({
@@ -103,6 +178,7 @@ var Login = React.createClass({
         }.bind(this));
   },
   componentDidMount: function() {
+      navBarStore.setItems(null);
     $("#login-form").fadeIn(1);
     $("#register-form").fadeOut(1);
     $('#register-form-link').removeClass('active');
@@ -214,6 +290,9 @@ var Login = React.createClass({
 });
 
 var Recover = React.createClass({
+    componentDidMount: function() {
+        navBarStore.setItems(null);
+    },
   render: function() {
     return (
       <h1>Talk to a TA to reset your password</h1>
@@ -223,7 +302,7 @@ var Recover = React.createClass({
 
 var TA = React.createClass({
   getInitialState: function() {
-    return {queue: null, size: 0, active: false};
+    return {student: null, queue: null, size: 0, active: false, emptyQueue: false, showMessage: false, messageText: ""};
   },
     getNext: function() {
         var url = "/ta/next";
@@ -236,7 +315,7 @@ var TA = React.createClass({
             },
             // on success, update queue
             success: function(res) {
-                this.setState({queue: res.queue, size: res.size});
+                this.setState({student: res.student, queue: res.queue, size: res.size});
             }.bind(this),
             error: function(xhr, status, err) {
                 console.error(url, status, err.toString());
@@ -251,6 +330,7 @@ var TA = React.createClass({
           type: 'GET',
           // on success, update queue
           success: function(res) {
+              navBarStore.setCount(res.size);
               this.setState({queue: res.queue, size: res.size, active: res.active});
           }.bind(this),
           error: function(xhr, status, err) {
@@ -275,6 +355,15 @@ var TA = React.createClass({
           }.bind(this)
       });
   },
+    closeEmpty: function() {
+        this.setState({emptyQueue: false});
+    },
+    closeMessage: function() {
+        this.setState({showMessage: false});
+    },
+    closeModal: function() {
+        this.setState({student: null});
+    },
   disableQueue: function() {
       console.log("disabling queue");
       var url = "/ta/stop";
@@ -293,6 +382,23 @@ var TA = React.createClass({
           }.bind(this)
       });
   },
+    emptyQueue: function() {
+      var url = "/ta/empty";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+                token: localStorage.token
+            },
+            success: function() {
+                this.setState({emptyQueue: false});
+                this.getQueue();
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }
+        })
+    },
     enableQueue: function() {
         console.log("enabling queue");
         var url = "/ta/start";
@@ -328,43 +434,127 @@ var TA = React.createClass({
                 console.error(url, status, err.toString());
             }.bind(this)});
     },
+    sendMessage: function() {
+        var url = "/ta/message";
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: {
+                token: localStorage.token,
+                message: this.state.messageText
+            },
+            success: function(res) {
+                this.setState({messageText: "", showMessage: false});
+            }.bind(this),
+            error: function(xhr, status, err) {
+                console.error(url, status, err.toString());
+            }.bind(this)
+        })
+    },
+    showEmpty: function() {
+      this.setState({emptyQueue: true});
+    },
+    showMessage: function() {
+        this.setState({showMessage: true});
+    },
+    toggleQueue: function() {
+        this.state.active ? this.disableQueue() : this.enableQueue();
+        var items = navBarStore.items;
+        var itemIndex = items.findIndex(function(e, i, a) {
+            return e.callback == this.toggleQueue;
+        }.bind(this));
+        items[itemIndex] = {
+            callback: this.toggleQueue,
+            label: this.state.active ? "Start" : "Stop"
+        };
+        navBarStore.setItems(items);
+    },
+    updateMessageText: function(event) {
+        this.setState({messageText: event.target.value});
+    },
   componentDidMount: function() {
+      var items = [
+          {callback: this.toggleQueue, label: (this.state.active ? "Start" : "Stop")},
+          {callback: this.getNext, label: "Next"},
+          {callback: this.showEmpty, label: "Empty"},
+          {callback: this.showMessage, label: "Message"}];
+      navBarStore.setItems(items);
       this.getQueue();
       setInterval(this.getQueueStatus, 2000);
   },
   onChange: function() {},
+
   render: function() {
       console.log("rendering");
-      var buttontext = this.state.active ? "Stop" : "Start";
-      var onClickFun = this.state.active ? this.disableQueue : this.enableQueue;
-      var buttontype = this.state.active ? "btn btn-danger" : "btn btn-success";
       var index = 0;
-      //<button className="btn btn-warning" onClick={this.emptyQueue}>Empty Queue</button>
     return (
-        <div className="row">
-            <div className="col-xs-10 col-xs-offset-1">
-                <button className={buttontype} onClick={onClickFun}>{buttontext}</button>
-                <button className="btn btn-default" onClick={this.getNext}>Get Next Student</button>
-                <table className="table">
-                    <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Select</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {this.state.queue != null ? this.state.queue.map(function(student) {
-                        ++index;
-                        return(<tr>
-                            <td>{index}</td>
-                            <td>{student.name}</td>
-                            <td><button className="btn btn-default" onClick={this.removeStudent.bind(this, index - 1)}>Remove</button></td>
-                        </tr>);
-                    }.bind(this)) : null}
-                    </tbody>
-                </table>
+        <div className="container-fluid" style={{height: "71%", overflow: "auto"}}>
+            <div className="row">
+                <div className="col-xs-10 col-xs-offset-1">
+                    <table className="table table-responsive">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Room</th>
+                            <th>Description</th>
+                            <th>Remove</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {this.state.queue != null ? this.state.queue.map(function(student) {
+                            ++index;
+                            return(<tr>
+                                <td>{index}</td>
+                                <td>{student.user.name}</td>
+                                <td>{student.room}</td>
+                                <td>{student.description}</td>
+                                <td><button className="btn btn-default" onClick={this.removeStudent.bind(this, index - 1)}>Remove</button></td>
+                            </tr>);
+                        }.bind(this)) : null}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+            {this.state.student != null ?
+                <Modal show="true" onHide={this.closeModal}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>{this.state.student.name} in Room {this.state.student.room}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>Description: {this.state.student.description}</p>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <button className="btn btn-info" onClick={this.closeModal}>Close</button>
+                    </Modal.Footer>
+                </Modal>: null}
+            {this.state.emptyQueue ?
+                <Modal show="true" onHide={this.closeEmpty}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Confirm Empty Queue</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <p>WARNING: This action is not undoable.</p>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <button className="btn btn-default" onClick={this.closeEmpty}>Cancel</button>
+                        <button className="btn btn-info" onClick={this.emptyQueue}>Confirm</button>
+                    </Modal.Footer>
+                </Modal>
+                : null}
+            {this.state.showMessage ?
+                <Modal show="true" onHide={this.closeMessage}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Send Message to All Students</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <Input type="textarea" placeholder="Please enter your message" onChange={this.updateMessageText}/>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <button className="btn btn-default" onClick={this.closeModal}>Close</button>
+                        <button className="btn btn-info" onClick={this.sendMessage}>Send</button>
+                    </Modal.Footer>
+                </Modal>: null}
         </div>
     );
   }
@@ -372,7 +562,7 @@ var TA = React.createClass({
 
 var Student = React.createClass({
     getInitialState: function() {
-        return {position: -1, size: 0, active: false, message: null};
+        return {room: null, description: null, position: -1, size: 0, active: false, message: null};
     },
     closeModal: function() {
       this.setState({message: null});
@@ -388,8 +578,10 @@ var Student = React.createClass({
             },
             success: function(res) {
                 if (res.message) {
+                    navBarStore.setCount(res.size);
                     this.setState({active: res.active, size: res.size, position: res.position, message: res.message});
                 } else if (this.state.active != res.active || this.state.size != res.size || this.state.position != res.position) {
+                    navBarStore.setCount(res.size);
                     this.setState({active: res.active, size: res.size, position: res.position});
                 }
             }.bind(this),
@@ -405,7 +597,9 @@ var Student = React.createClass({
             url: url,
             type: 'POST',
             data: {
-              token: localStorage.token
+              token: localStorage.token,
+                room: this.state.room,
+                description: this.state.description
             },
             // on success, update queue
             success: function() {
@@ -432,7 +626,14 @@ var Student = React.createClass({
             }.bind(this)
         });
     },
+    updateRoom: function(event) {
+      this.setState({room: event.target.value});
+    },
+    updateDescription: function(event) {
+        this.setState({description: event.target.value});
+    },
     componentDidMount: function() {
+        navBarStore.setItems(null);
         this.getPosition();
         setInterval(this.getPosition, 2000);
     },
@@ -442,14 +643,12 @@ var Student = React.createClass({
     render: function() {
         console.log("rendering");
         return (
-            <div className="container">
+            <div className="container-fluid">
                 <div className="row">
                     {this.state.active ?
-                        <div className="col-md-6 col-md-offset-3">
-                            <h2>Queue is Active!</h2>
-                            <p>Current queue size is: {this.state.size}</p>
+                        <div className="col-xs-10 col-xs-offset-1 col-sm-6 col-sm-offset-3">
                             {this.state.position != -1 ?
-                                <div>
+                                <div className="text-center">
                                     {this.state.position == 0 ?
                                         <h2>You are next</h2>:
                                         (this.state.position == 1 ?
@@ -457,30 +656,94 @@ var Student = React.createClass({
                                             <h2>There are {this.state.position} people in front of you</h2>)}
                                     <button className="btn btn-danger" onClick={this.leave}>Leave Queue</button>
                                 </div>:
-                                <button className="btn btn-info" onClick={this.join}>Join Queue</button>}
+                                <div className="row">
+                                    <div className="col-xs-5">
+                                        <input type="text" className="form-control" placeholder="Room (ie. 1030)" onChange={this.updateRoom}/>
+                                    </div>
+                                    <div className="col-xs-5">
+                                        <input type="text" className="form-control" placeholder="Description" onChange={this.updateDescription}/>
+                                    </div>
+                                    <div className="col-xs-2">
+                                        <button className="btn btn-info" onClick={this.join}>Join Queue</button>
+                                    </div>
+                                </div>}
                         </div>:
                         <h2>Queue not active</h2>}
                 </div>
-                <Modal show={this.state.message == "helping"} onHide={this.closeModal}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>The TA should arrive shortly</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>Please do not add yourself back onto the queue until the TA arrives.</p>
-                    </Modal.Body>
-                </Modal>
-                <Modal show={this.state.message == "removed"} onHide={this.closeModal}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>You have been removed from the queue</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>If you feel you have been removed without reason, please contact a TA.</p>
-                    </Modal.Body>
-                </Modal>
+                {this.state.message != null ?
+                    <div>
+                        <Modal show={this.state.message.type == "helping"} onHide={this.closeModal}>
+                            <Modal.Header closeButton>
+                                <Modal.Title>The TA should arrive shortly</Modal.Title>
+                            </Modal.Header>
+                            <Modal.Body>
+                                <p>Please do not add yourself back onto the queue until the TA arrives.</p>
+                            </Modal.Body>
+                            <Modal.Footer>
+                                <button className="btn btn-info" onClick={this.closeModal}>Close</button>
+                            </Modal.Footer>
+                        </Modal>
+                        <Modal show={this.state.message.type == "removed"} onHide={this.closeModal}>
+                            <Modal.Header closeButton>
+                                <Modal.Title>You have been removed from the queue</Modal.Title>
+                            </Modal.Header>
+                            <Modal.Body>
+                                <p>If you feel you have been removed without reason, please contact a TA.</p>
+                            </Modal.Body>
+                            <Modal.Footer>
+                                <button className="btn btn-info" onClick={this.closeModal}>Close</button>
+                            </Modal.Footer>
+                        </Modal>
+                        <Modal show={this.state.message.type == "message"} onHide={this.closeModal}>
+                            <Modal.Header closeButton>
+                                <Modal.Title>Message from the TAs</Modal.Title>
+                            </Modal.Header>
+                            <Modal.Body>
+                                <p>{this.state.message.value}</p>
+                            </Modal.Body>
+                            <Modal.Footer>
+                                <button className="btn btn-info" onClick={this.closeModal}>Close</button>
+                            </Modal.Footer>
+                        </Modal>
+                    </div>
+                : null}
+
             </div>
         );
     }
 });
+
+var navBarStore = {
+    items: null,
+    listeners: [],
+    count: 0,
+
+    emitChange(trigger) {
+        this.listeners.forEach(function(listener) {
+            if (listener.trigger == trigger) {
+                listener.callback();
+            }
+        });
+    },
+
+    addChangeListener(cb, trigger) {
+        this.listeners.push({callback: cb, trigger: trigger});
+    },
+
+    removeChangeListener(cb, trigger) {
+        this.listeners.splice(this.listeners.indexOf({callback: cb, trigger: trigger}), 1);
+    },
+
+    setItems(items) {
+        this.items = items;
+        this.emitChange('items');
+    },
+
+    setCount(count) {
+        this.count = count;
+        this.emitChange('count');
+    }
+}
 
 var auth = {
     register: function(name, username, password, classkey, cb) {
@@ -594,9 +857,11 @@ var auth = {
 
 var routes = (
   <Router>
-    <Route path="/" component={App}>
-      <Route path="/recover" component={Recover}/>
-       <Route path="/ta" component={TA}/>
+    <Route component={App}>
+    <Route path="/" component={Home}/>
+    <Route path="/login" component={Login}/>
+    <Route path="/recover" component={Recover}/>
+    <Route path="/ta" component={TA}/>
     <Route path="/student" component={Student}/>
     </Route>
    
