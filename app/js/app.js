@@ -136,10 +136,12 @@ var Home = React.createClass({
         auth.onChange.splice(index, 1);
     },
     toQueue: function() {
-        if (auth.getPerm())
+        console.log(auth.getPerm());
+        if (auth.getPerm() == true) {
             this.history.pushState(null, '/ta');
-        else
+        } else {
             this.history.pushState(null, '/student');
+        }
     },
    render: function() {
        return (
@@ -513,7 +515,7 @@ var TA = React.createClass({
     },
   componentDidMount: function() {
       var items = [
-          {callback: this.toggleQueue, label: (this.state.active ? "Start" : "Stop")},
+          {callback: this.toggleQueue, label: (this.state.active ? "Stop" : "Start")},
           {callback: this.getNext, label: "Next"},
           {callback: this.showEmpty, label: "Empty"},
           {callback: this.showMessage, label: "Message"}];
@@ -758,7 +760,9 @@ var navBarStore = {
     count: 0,
 
     emitChange(trigger) {
+        console.log("trigger: " + trigger);
         this.listeners.forEach(function(listener) {
+            console.log(listener);
             if (listener.trigger == trigger) {
                 listener.callback();
             }
@@ -892,7 +896,6 @@ var auth = {
         delete localStorage.token;
         delete localStorage.perm;
         delete localStorage.username;
-        delete localStorage.perm;
         if (cb) cb();
         this.onChange.forEach(function(obj) {
             obj.cb(false);
